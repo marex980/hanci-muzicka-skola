@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Gitara – nedelje</title>
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Gitara%20Nedelje%22%2C%22short_name%22%3A%22Gitara%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%234285f4%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%253Ccircle%20cx%3D'50'%20cy%3D'50'%20r%3D'48'%20fill%3D'%234285f4'%2F%3E%253Ctext%20x%3D'50'%20y%3D'70'%20font-size%3D'60'%20text-anchor%3D'middle'%20fill%3D'white'%20font-family%3D'Arial'%3E%25E2%2599%25AA%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+  <meta name="theme-color" content="#4285f4">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f5f7fb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    #weekLetter {
+      font-size: 72px;
+      font-weight: 800;
+      color: #4285f4;
+      margin: 8px 0;
+    }
+    .schedule {
+      background: #f0f4ff;
+      border-radius: 16px;
+      padding: 16px;
+      margin: 20px 0;
+      font-size: 20px;
+      line-height: 1.6;
+    }
+    .schedule div {
+      margin: 8px 0;
+    }
+    .day { font-weight: 600; }
+    button {
+      display: block;
+      width: 100%;
+      margin: 12px 0;
+      padding: 14px;
+      font-size: 18px;
+      border: none;
+      border-radius: 14px;
+      background: #e8ecf1;
+      color: #333;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:active { transform: scale(0.97); }
+    button.primary { background: #4285f4; color: white; }
+    button.warn { background: #fce8e6; color: #c5221f; }
+    .setup-panel {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+      display: none;
+    }
+    .setup-panel input {
+      width: 100%;
+      padding: 12px;
+      font-size: 18px;
+      border: 1px solid #dadce0;
+      border-radius: 12px;
+      margin: 8px 0;
+    }
+    .note {
+      font-size: 14px;
+      color: #5f6368;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2 style="font-weight:400; color:#5f6368;">Časovi gitare</h2>
+    <div id="weekLetter">...</div>
+    <div class="schedule" id="schedule">
+      <!-- JS popunjava -->
+    </div>
+    <button id="skipBtn" class="primary">Preskoči nedelju → sledeća će biti A</button>
+    <button id="resetBtn" class="warn">Vrati na automatski ritam</button>
+    <button id="setupBtn" style="background:transparent; font-size:16px; color:#5f6368;">⚙️ Podešavanja</button>
+    <div class="setup-panel" id="setupPanel">
+      <p style="margin-bottom:8px;">Unesi ponedeljak koji je bio <b>A nedelja</b>:</p>
+      <input type="date" id="refDateInput">
+      <button id="saveRefBtn" class="primary" style="margin-top:8px;">Sačuvaj referentni datum</button>
+      <p class="note" id="setupMsg"></p>
+    </div>
+    <p class="note" id="status"></p>
+  </div>
+
+  <!-- Firebase SDK (tvoja konfiguracija, verzija 12.12.1) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+    import { getFirestore, doc, onSnapshot, setDoc, getDoc, updateDoc, increment }
+      from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged }
+      from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+
+    // Tvoja konfiguracija
+    const firebaseConfig = {
+      apiKey: "AIzaSyBpxd-4A9v2Fu0XPLy_TfUP9Z-miK5xxsk",
+      authDomain: "hana-muzicka-skola.firebaseapp.com",
+      projectId: "hana-muzicka-skola",
+      storageBucket: "hana-muzicka-skola.firebasestorage.app",
+      messagingSenderId: "665157992426",
+      appId: "1:665157992426:web:3137bd09aecee11a557c93",
+      measurementId: "G-YNKJ27G0KS"   // ne smeta, mada ga ne koristimo
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Raspored (možeš prilagoditi sate)
+    const schedule = {
+      A: { wednesday: "18:15", saturday: "15:30" },
+      B: { wednesday: "18:30", saturday: "17:45" }
+    };
+
+    // UI elementi
+    const weekLetterEl = document.getElementById("weekLetter");
+    const scheduleEl = document.getElementById("schedule");
+    const skipBtn = document.getElementById("skipBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const setupBtn = document.getElementById("setupBtn");
+    const setupPanel = document.getElementById("setupPanel");
+    const refDateInput = document.getElementById("refDateInput");
+    const saveRefBtn = document.getElementById("saveRefBtn");
+    const setupMsg = document.getElementById("setupMsg");
+    const statusEl = document.getElementById("status");
+
+    let currentDocData = null;
+
+    function getMondayOfWeek(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = (day === 0 ? -6 : 1 - day);
+      const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
+      monday.setHours(0,0,0,0);
+      return monday;
+    }
+
+    function formatDate(d) {
+      return d.toLocaleDateString("sr-RS", { day: "2-digit", month: "2-digit", year: "numeric" });
+    }
+
+    function updateUI(referentniDatum, rucniOffset) {
+      const refMonday = new Date(referentniDatum + "T00:00:00");
+      const nowMonday = getMondayOfWeek(new Date());
+      const diffDays = (nowMonday - refMonday) / (1000*60*60*24);
+      const diffWeeks = Math.floor(diffDays / 7);
+      const effectiveWeek = diffWeeks + (rucniOffset || 0);
+      const weekType = (effectiveWeek % 2 === 0) ? "A" : "B";
+
+      weekLetterEl.textContent = "Nedelja " + weekType;
+
+      const wedDate = new Date(nowMonday);
+      wedDate.setDate(nowMonday.getDate() + 2);
+      const satDate = new Date(nowMonday);
+      satDate.setDate(nowMonday.getDate() + 5);
+
+      scheduleEl.innerHTML = `
+        <div><span class="day">Sreda</span> ${formatDate(wedDate)} – ${schedule[weekType].wednesday}</div>
+        <div><span class="day">Subota</span> ${formatDate(satDate)} – ${schedule[weekType].saturday}</div>
+      `;
+    }
+
+    // Osvežavanje iz Firestore‑a
+    function startListening() {
+      const docRef = doc(db, "settings", "week");
+      onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          currentDocData = docSnap.data();
+          updateUI(currentDocData.referentniDatum, currentDocData.rucniOffset);
+          statusEl.textContent = "🟢 Sinhronizovano";
+        } else {
+          weekLetterEl.textContent = "?";
+          scheduleEl.innerHTML = "Prvo podesi referentni datum.";
+          setupPanel.style.display = "block";
+          statusEl.textContent = "⚪ Nema podešavanja";
+          currentDocData = null;
+        }
+      }, (error) => {
+        statusEl.textContent = "🔴 Greška: " + error.message;
+      });
+    }
+
+    // Preskakanje nedelje
+    async function skipWeek() {
+      if (!currentDocData) return;
+      try {
+        await updateDoc(doc(db, "settings", "week"), {
+          rucniOffset: increment(1)
+        });
+      } catch (e) {
+        alert("Greška pri ažuriranju: " + e.message);
+      }
+    }
+
+    // Reset na automatski ritam
+    async function resetOffset() {
+      if (!currentDocData) return;
+      try {
+        await updateDoc(doc(db, "settings", "week"), {
+          rucniOffset: 0
+        });
+      } catch (e) {
+        alert("Greška: " + e.message);
+      }
+    }
+
+    // Prvo postavljanje referentnog datuma
+    async function setReferenceDate(dateStr) {
+      try {
+        const docRef = doc(db, "settings", "week");
+        const existing = await getDoc(docRef);
+        if (existing.exists()) {
+          setupMsg.textContent = "Već postoji referentni datum! Ako želiš da ga promeniš, prvo obriši dokument u Firebase konzoli.";
+          return;
+        }
+        await setDoc(docRef, {
+          referentniDatum: dateStr,
+          rucniOffset: 0
+        });
+        setupMsg.textContent = "Sačuvano!";
+        setupPanel.style.display = "none";
+      } catch (e) {
+        setupMsg.textContent = "Greška: " + e.message;
+      }
+    }
+
+    // Anonimna prijava
+    signInAnonymously(auth).catch(e => {
+      statusEl.textContent = "🔴 Prijava nije uspela: " + e.message;
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        startListening();
+      } else {
+        statusEl.textContent = "Prijavljivanje...";
+      }
+    });
+
+    // Dugmad
+    skipBtn.addEventListener("click", skipWeek);
+    resetBtn.addEventListener("click", resetOffset);
+    setupBtn.addEventListener("click", () => {
+      setupPanel.style.display = setupPanel.style.display === "block" ? "none" : "block";
+    });
+    saveRefBtn.addEventListener("click", () => {
+      const val = refDateInput.value;
+      if (!val) {
+        setupMsg.textContent = "Izaberi datum!";
+        return;
+      }
+      setReferenceDate(val);
+    });
+
+    // Servis‑radnik za PWA
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js")
+        .then(() => console.log("SW ok"))
+        .catch(err => console.log("SW fail", err));
+    }
+  </script>
+</body>
+</html>
